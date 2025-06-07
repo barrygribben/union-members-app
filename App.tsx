@@ -295,7 +295,7 @@ export default function App() {
               value={searchTerm}
               onChangeText={setSearchTerm}
             />
-            <Button title="Search" onPress={searchMembers} />
+            <Button title="Search members" onPress={searchMembers} />
           </>
         )}
         <Button title="Log Out" onPress={logout} color="red" />
