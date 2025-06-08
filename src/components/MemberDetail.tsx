@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, Image } from 'react-native';
 import { supabase } from '../../lib/supabase'; 
 
 type Member = {
   id: number;
   full_name: string;
   membership_status: string;
+  avatar_url?: string;
 };
 
 type Props = {
@@ -82,13 +83,14 @@ const MemberDetail: React.FC<Props> = ({ member, onBack }) => {
         </>
       ) : (
         <>
+          <Image source={{ uri: member.avatar_url }} style={styles.avatar} resizeMode="cover" />
           <Text style={styles.meta}>Name: {member.full_name}</Text>
           <Text style={styles.meta}>Status: {member.membership_status}</Text>
           <Button title="Edit" onPress={() => setEditing(true)} />
         </>
       )}
 
-      <Button title="Back to Results" onPress={onBack} />
+<Button title="Back to Results" onPress={() => onBack()} />
     </View>
   );
 };
@@ -118,5 +120,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 10,
     color: '#333',
+  },
+  avatar: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    alignSelf: 'center',
+    marginBottom: 20,
   },
 });

@@ -243,6 +243,12 @@ export default function App() {
     keyExtractor={(item) => item.id.toString()}
     renderItem={({ item }) => (
       <View style={styles.profileCard}>
+        {item.avatar_url && (
+      <Image
+        source={{ uri: item.avatar_url }}
+        style={{ width: 40, height: 40, borderRadius: 20, marginBottom: 8 }}
+      />
+    )}
         <Text style={styles.meta}>Name: {item.full_name}</Text>
         <Text style={styles.meta}>Status: {item.membership_status}</Text>
         <Button title="View Details" onPress={() => setSelectedMember(item)} />
