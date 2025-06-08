@@ -15,6 +15,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Provider as PaperProvider } from 'react-native-paper';
 import { Picker } from '@react-native-picker/picker';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import MemberDetail from './src/components/MemberDetail';
 // Add type definitions
 type Profile = {
   id: string;
@@ -36,6 +37,7 @@ export default function App() {
   const [password, setPassword] = useState('');
   const [profile, setProfile] = useState<Profile | null>(null);
   const [member, setMember] = useState<Member | null>(null);
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [editedName, setEditedName] = useState('');
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -208,6 +210,17 @@ export default function App() {
       </PaperProvider>
     );
   }
+  if (selectedMember) {
+    return (
+      <PaperProvider>
+        <MemberDetail
+          member={selectedMember}
+          onBack={() => setSelectedMember(null)}
+        />
+      </PaperProvider>
+    );
+  }
+
   if (profile.role === 'organiser' && viewingSearchScreen) {
     return (
       <PaperProvider>
@@ -244,14 +257,7 @@ export default function App() {
                   <>
                     <Text style={styles.meta}>Name: {item.full_name}</Text>
                     <Text style={styles.meta}>Status: {item.membership_status}</Text>
-                    <Button
-                      title="Edit"
-                      onPress={() => {
-                        setEditingMemberId(item.id);
-                        setEditedMemberName(item.full_name);
-                        setEditedMemberStatus(item.membership_status);
-                      }}
-                    />
+                    <Button title="View Details" onPress={() => setSelectedMember(item)} />
                   </>
                 )}
               </View>
