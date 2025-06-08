@@ -29,9 +29,7 @@ type Member = {
   membership_status: string;
   avatar_url?: string;
 };
-const SUPABASE_URL = 'https://mufqimmxygsryxrigkec.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11ZnFpbW14eWdzcnl4cmlna2VjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkyNTg5MjYsImV4cCI6MjA2NDgzNDkyNn0.wSKVcocMI1oahb68MhDCyQcqem8NimF18rtm-HpNUOs';
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+import { supabase } from './lib/supabase'; 
 export default function App() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -173,7 +171,8 @@ export default function App() {
     const { data, error } = await supabase
       .from('members')
       .select('*')
-      .ilike('full_name', `%${searchTerm}%`);
+      .ilike('full_name', `%${searchTerm}%`)
+      .order('id', { ascending: true });  // <-- explicitly order by ID;
     if (error) {
       Alert.alert('Search Error', error.message);
     } else {
@@ -213,10 +212,13 @@ export default function App() {
   if (selectedMember) {
     return (
       <PaperProvider>
-        <MemberDetail
-          member={selectedMember}
-          onBack={() => setSelectedMember(null)}
-        />
+<MemberDetail
+  member={selectedMember}
+  onBack={(shouldRefresh) => {
+    setSelectedMember(null);
+    if (shouldRefresh) searchMembers();  // re-fetch latest data
+  }}
+/>
       </PaperProvider>
     );
   }
@@ -227,42 +229,27 @@ export default function App() {
         <View style={styles.container}>
           <Text style={styles.title}>Search Results</Text>
           <Button title="Back to Dashboard" onPress={() => setViewingSearchScreen(false)} />
-          <FlatList
-            data={searchResults}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => (
-              <View style={styles.profileCard}>
-                {editingMemberId === item.id ? (
-                  <>
-                    <TextInput
-                      style={styles.input}
-                      value={editedMemberName}
-                      onChangeText={setEditedMemberName}
-                      placeholder="Name"
-                    />
-                    <Picker
-                      selectedValue={editedMemberStatus}
-                      onValueChange={(itemValue) => setEditedMemberStatus(itemValue)}
-                      mode="dropdown"
-                      style={styles.input}
-                    >
-                      <Picker.Item label="Active" value="active" />
-                      <Picker.Item label="Inactive" value="inactive" />
-                      <Picker.Item label="Suspended" value="suspended" />
-                      <Picker.Item label="Pending" value="pending" />
-                    </Picker>
-                    <Button title="Save Changes" onPress={updateMember} />
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.meta}>Name: {item.full_name}</Text>
-                    <Text style={styles.meta}>Status: {item.membership_status}</Text>
-                    <Button title="View Details" onPress={() => setSelectedMember(item)} />
-                  </>
-                )}
-              </View>
-            )}
-          />
+          {selectedMember ? (
+            <MemberDetail
+  member={selectedMember}
+  onBack={(shouldRefresh) => {
+    setSelectedMember(null);
+    if (shouldRefresh) searchMembers();  // re-fetch latest data
+  }}
+/>
+) : (
+  <FlatList
+    data={searchResults}
+    keyExtractor={(item) => item.id.toString()}
+    renderItem={({ item }) => (
+      <View style={styles.profileCard}>
+        <Text style={styles.meta}>Name: {item.full_name}</Text>
+        <Text style={styles.meta}>Status: {item.membership_status}</Text>
+        <Button title="View Details" onPress={() => setSelectedMember(item)} />
+      </View>
+    )}
+  />
+)}
           <Button title="Back to Dashboard" onPress={() => setViewingSearchScreen(false)} />
         </View>
       </PaperProvider>
