@@ -9,16 +9,17 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const bucketName = 'avatars';
 
-async function uploadAvatar(member) {
-  const imageUrl = `https://randomuser.me/api/portraits/men/${member.id % 100}.jpg`;
+async function uploadAvatar(user) {
+  const hash = [...user.id].reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const imageUrl = `https://randomuser.me/api/portraits/men/${hash % 100}.jpg`;
 
   try {
     const res = await fetch(imageUrl);
     const arrayBuffer = await res.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    if (!res.ok) throw new Error(`Image fetch failed for ID ${member.id}`);
+    if (!res.ok) throw new Error(`Image fetch failed for ID ${user.id}`);
     
-    const filePath = `avatars/member-${member.id}.jpg`;
+    const filePath = `avatars/user-${user.id}.jpg`;
 
     // Upload image
     const { error: uploadError } = await supabase.storage
@@ -29,38 +30,38 @@ async function uploadAvatar(member) {
     });
 
     if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
-    console.log(`Uploaded image for ${member.full_name}`);
+    console.log(`Uploaded image for ${user.full_name}`);
 
     const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${filePath}`;
 
-    // Update member row
+    // Update user row
     const { error: updateError } = await supabase
-      .from('members')
+      .from('users')
       .update({ avatar_url: publicUrl })
-      .eq('id', member.id);
+      .eq('id', user.id);
 
     if (updateError) throw new Error(`Update failed: ${updateError.message}`);
-    console.log(`Updated avatar URL for ${member.full_name}`);
+    console.log(`Updated avatar URL for ${user.full_name}`);
 
   } catch (err) {
-    console.error(`❌ Failed for ${member.full_name}:`, err.message);
+    console.error(`❌ Failed for ${user.full_name}:`, err.message);
   }
 }
 
 async function run() {
-  const { data: members, error } = await supabase
-    .from('members')
+  const { data: users, error } = await supabase
+    .from('users')
     .select('id, full_name')
-    .like('full_name', 'Darren%');
+    .like('full_name', 'David%');
 
   if (error) {
-    console.error('Error fetching members:', error.message);
+    console.error('Error fetching users:', error.message);
     return;
   }
 
-  console.log(`Found ${members.length} Darren(s)`);
-  for (const member of members) {
-    await uploadAvatar(member);
+  console.log(`Found ${users.length} David(s)`);
+  for (const user of users) {
+    await uploadAvatar(user);
   }
 
   console.log('✅ Finished uploading avatars.');

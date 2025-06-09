@@ -2,41 +2,53 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Image } from 'react-native';
 import { supabase } from '../../lib/supabase'; 
 
-type Member = {
-  id: number;
+type User = {
+  id: string;  // UUID from auth.users
+  oldmember_id?: any;
   full_name: string;
-  membership_status: string;
+  email: string;
+  role?: string;
+  membership_status?: string;
   avatar_url?: string;
-};
+  phone?: string;
+  address?: string;
+  region?: string;
+  created_at?: string;
 
+  // Add any other fields you've added to the `users` table
+};
 type Props = {
-  member: Member;
+  user: User;
   onBack: (refresh?: boolean) => void;
 };
 
-const MemberDetail: React.FC<Props> = ({ member, onBack }) => {
+const MemberDetail: React.FC<Props> = ({ user, onBack }) => {
   const [editing, setEditing] = useState(false);
-  const [editedName, setEditedName] = useState(member.full_name);
-  const [editedStatus, setEditedStatus] = useState(member.membership_status);
+  const [editedName, setEditedName] = useState(user.full_name);
+  const [editedStatus, setEditedStatus] = useState(user.membership_status);
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
-    const { error } = await supabase
-      .from('members')
+
+    const { data, error } = await supabase
+      .from('users')
       .update({
         full_name: editedName,
-        membership_status: editedStatus,
+        membership_status: editedStatus
       })
-      .eq('id', member.id);
-
-    setSaving(false);
+      .eq('id', user.id)
+      .select();
+    
+      setSaving(false);
 
     if (error) {
       alert('Error saving changes: ' + error.message);
+    } else if (!data || data.length === 0) {
+      alert('No changes were made. Could not find user to update.');
     } else {
       alert('Changes saved');
-      setEditing(false);
+      onBack(true);  // <-- pass the updated user
     }
   };
 
@@ -46,46 +58,25 @@ const MemberDetail: React.FC<Props> = ({ member, onBack }) => {
 
       {editing ? (
         <>
-          <TextInput
-            value={editedName}
-            onChangeText={setEditedName}
-            style={styles.input}
-            placeholder="Full Name"
-          />
+        <TextInput
+          value={editedName}
+          onChangeText={setEditedName}
+          style={styles.input}
+          placeholder="Full Name"
+        />
           <TextInput
             value={editedStatus}
             onChangeText={setEditedStatus}
             style={styles.input}
             placeholder="Status"
           />
-          <Button
-  title="Save"
-  onPress={async () => {
-    setSaving(true);
-    const { error } = await supabase
-      .from('members')
-      .update({
-        full_name: editedName,
-        membership_status: editedStatus,
-      })
-      .eq('id', member.id);
-
-    if (error) {
-      alert('Error saving changes');
-    } else {
-      alert('Changes saved');
-      onBack(true);  // trigger refresh in parent
-    }
-
-    setSaving(false);
-  }}
-/>
+          <Button title="Save" onPress={handleSave} />
         </>
       ) : (
         <>
-          <Image source={{ uri: member.avatar_url }} style={styles.avatar} resizeMode="cover" />
-          <Text style={styles.meta}>Name: {member.full_name}</Text>
-          <Text style={styles.meta}>Status: {member.membership_status}</Text>
+          <Image source={{ uri: user.avatar_url }} style={styles.avatar} resizeMode="cover" />
+          <Text style={styles.meta}>Name: {user.full_name}</Text>
+          <Text style={styles.meta}>Status: {user.membership_status}</Text>
           <Button title="Edit" onPress={() => setEditing(true)} />
         </>
       )}
