@@ -11,17 +11,15 @@ import {
   Image,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { createClient, User as SupabaseUser } from '@supabase/supabase-js';
 import { Provider as PaperProvider } from 'react-native-paper';
-import { Picker } from '@react-native-picker/picker';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
 import MemberDetail from './src/components/MemberDetail';
+import { supabase } from './lib/supabase';
 
-// Add type definitions
+// Type definitions
 
 type User = {
-  id: string;  // UUID from auth.users
-  oldmember_id: any;
+  id: string;
+  oldmember_id?: any;
   full_name: string;
   email: string;
   role?: string;
@@ -31,15 +29,8 @@ type User = {
   address?: string;
   region?: string;
   created_at?: string;
-  // Add any other fields you've added to the `users` table
-};
-type Props = {
-  user: User;
-  onBack: (refresh?: boolean) => void;
 };
 
-
-import { supabase } from './lib/supabase'; 
 export default function App() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -49,11 +40,9 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<User[]>([]);
-  const [editingMemberId, setEditingMemberId] = useState<number | null>(null);
-  const [editedMemberName, setEditedMemberName] = useState('');
-  const [editedMemberStatus, setEditedMemberStatus] = useState('');
   const [viewingSearchScreen, setViewingSearchScreen] = useState(false);
   const [uploading, setUploading] = useState(false);
+
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -61,48 +50,29 @@ export default function App() {
       aspect: [4, 4],
       quality: 0.7,
     });
-  
-    if (result.canceled) {
-      console.log("Image picking cancelled.");
-      return;
-    }
-  
-    const uri = result.assets?.[0]?.uri;
-    console.log("Image URI:", uri);
-    if (uri) {const searchUsers = async () => {
-    const { data, error } = await supabase
-    .from('users')
-    .select('*')
-    .ilike('full_name', `%${searchTerm}%`);
 
-  if (error) {
-    Alert.alert('Search Error', error.message);
-  } else {
-    setSearchResults(data);
-    setViewingSearchScreen(true);
-  }
-};
-      uploadImage(uri);
-    } else {
-      console.log("No image selected or URI missing.");
-    }
+    if (result.canceled) return;
+
+    const uri = result.assets?.[0]?.uri;
+    if (uri) uploadImage(uri);
   };
+
   const uploadImage = async (uri: string) => {
     try {
       setUploading(true);
-      console.log("Uploading image from URI:", uri);
-      const info = await ImagePicker.getMediaLibraryPermissionsAsync();
-      console.log("Media Library Permissions:", info);
+      if (!user) return;
+
       const formData = new FormData();
-      if (!user) return null;
       formData.append('file', {
         uri,
         name: `${user.id}.jpg`,
         type: 'image/jpeg',
       } as any);
+
       const accessToken = (await supabase.auth.getSession()).data.session?.access_token;
       if (!accessToken) throw new Error("No access token found");
-      const uploadResponse = await fetch(`https://mufqimmxygsryxrigkec.supabase.co/storage/v1/object/avatars/${user?.id}.jpg`, {
+
+      const uploadResponse = await fetch(`https://mufqimmxygsryxrigkec.supabase.co/storage/v1/object/avatars/${user.id}.jpg`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -110,65 +80,63 @@ export default function App() {
         },
         body: formData,
       });
+
       if (!uploadResponse.ok) {
         const errText = await uploadResponse.text();
-        console.error("Upload response error:", errText);
-        throw new Error("Supabase upload failed");
+        throw new Error(errText);
       }
-      const filePath = `avatars/${user?.oldmember_id}.jpg`;
+
+      const filePath = `avatars/${user.oldmember_id}.jpg`;
       const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
       const avatar_url = publicUrlData.publicUrl;
-      console.log("Public URL:", avatar_url);
 
-      await supabase.from('users').update({ avatar_url }).eq('id', user?.id || 0);
+      await supabase.from('users').update({ avatar_url }).eq('id', user.id);
       setUser((prev) => (prev ? { ...prev, avatar_url } : null));
       Alert.alert('Success', 'Profile photo updated');
     } catch (e: any) {
-      console.error("Upload failed:", e.message);
       Alert.alert('Upload failed', e.message);
     } finally {
       setUploading(false);
     }
-    
   };
-  
-const handleLogin = async () => {
-  setLoading(true);
 
-  const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+  const handleLogin = async () => {
+    setLoading(true);
 
-  if (loginError || !loginData.user) {
-    Alert.alert('Login Failed', loginError?.message || 'Unknown error');
+    const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (loginError || !loginData.user) {
+      Alert.alert('Login Failed', loginError?.message || 'Unknown error');
+      setLoading(false);
+      return;
+    }
+
+    const userId = loginData.user.id;
+
+    const { data: userData, error: userFetchError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (userFetchError || !userData) {
+      Alert.alert('Login Success', 'But no user record found in `users` table');
+      setLoading(false);
+      return;
+    }
+
+    setUser(userData);
+    setEditedName(userData.full_name);
     setLoading(false);
-    return;
-  }
-
-  const userId = loginData.user.id;
-
-  const { data: userData, error: userFetchError } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', userId)
-    .single();
-
-  if (userFetchError || !userData) {
-    Alert.alert('Login Success', 'But no user record found in `users` table');
-    setLoading(false);
-    return;
-  }
-
-  setUser(userData);
-  setEditedName(userData.full_name);
-  setLoading(false);
-};
+  };
 
   const updateName = async () => {
     if (!user) return;
     const { error } = await supabase
-      .from('profiles')
+      .from('users')
       .update({ full_name: editedName })
       .eq('id', user.id);
     if (error) {
@@ -178,9 +146,10 @@ const handleLogin = async () => {
       setUser({ ...user, full_name: editedName });
     }
   };
+
   const logout = async () => {
     await supabase.auth.signOut();
-     setEmail('');
+    setEmail('');
     setPassword('');
     setEditedName('');
     setSearchTerm('');
@@ -188,32 +157,19 @@ const handleLogin = async () => {
     setViewingSearchScreen(false);
     setUser(null);
   };
+
   const searchUsers = async () => {
     const { data, error } = await supabase
       .from('users')
-      .select('*')
+      .select('id, full_name, email, role, membership_status, avatar_url')
       .ilike('full_name', `%${searchTerm}%`)
-      .order('id', { ascending: true });  // <-- explicitly order by ID;
+      .order('id', { ascending: true });
+    console.log('Search returned', data?.length, 'users:', data);
     if (error) {
       Alert.alert('Search Error', error.message);
     } else {
       setSearchResults(data);
       setViewingSearchScreen(true);
-    }
-  };
-  const updateUser = async () => {
-    const { error } = await supabase
-      .from('users')
-      .update({ full_name: editedMemberName, membership_status: editedMemberStatus })
-      .eq('id', editingMemberId);
-    if (error) {
-      Alert.alert('Update Error', error.message);
-    } else {
-      Alert.alert('Member updated');
-      setEditingMemberId(null);
-      setEditedMemberName('');
-      setEditedMemberStatus('');
-      searchUsers();
     }
   };
 
@@ -230,58 +186,50 @@ const handleLogin = async () => {
       </PaperProvider>
     );
   }
+
   if (selectedUser) {
     return (
       <PaperProvider>
-<MemberDetail
-  user={selectedUser}
-  onBack={(shouldRefresh) => {
-    setSelectedUser(null);
-    if (shouldRefresh) searchUsers();  // re-fetch latest data
-  }}
-/>
+        <MemberDetail
+          user={selectedUser}
+          onBack={(shouldRefresh) => {
+            setSelectedUser(null);
+            if (shouldRefresh) searchUsers();
+          }}
+        />
       </PaperProvider>
     );
   }
-  if (!user) return null;
+
   if (user.role === 'organiser' && viewingSearchScreen) {
     return (
       <PaperProvider>
         <View style={styles.container}>
           <Text style={styles.title}>Search Results</Text>
           <Button title="Back to Dashboard" onPress={() => setViewingSearchScreen(false)} />
-          {selectedUser ? (
-            <MemberDetail
-  user={selectedUser}
-  onBack={(shouldRefresh) => {
-    setSelectedUser(null);
-    if (shouldRefresh) searchUsers();  // re-fetch latest data
-  }}
-/>
-) : (
-  <FlatList
-    data={searchResults}
-    keyExtractor={(item) => item.id.toString()}
-    renderItem={({ item }) => (
-      <View style={styles.profileCard}>
-        {item.avatar_url && (
-      <Image
-        source={{ uri: item.avatar_url }}
-        style={{ width: 40, height: 40, borderRadius: 20, marginBottom: 8 }}
-      />
-    )}
-        <Text style={styles.meta}>Name: {item.full_name}</Text>
-        <Text style={styles.meta}>Status: {item.membership_status}</Text>
-        <Button title="View Details" onPress={() => setSelectedUser(item)} />
-      </View>
-    )}
-  />
-)}
+          <FlatList
+            data={searchResults}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={({ item }) => (
+              <View style={styles.profileCard}>
+                {item.avatar_url && (
+                  <Image
+                    source={{ uri: item.avatar_url }}
+                    style={{ width: 40, height: 40, borderRadius: 20, marginBottom: 8 }}
+                  />
+                )}
+                <Text style={styles.meta}>Name: {item.full_name}</Text>
+                <Text style={styles.meta}>Status: {item.membership_status}</Text>
+                <Button title="View Details" onPress={() => setSelectedUser(item)} />
+              </View>
+            )}
+          />
           <Button title="Back to Dashboard" onPress={() => setViewingSearchScreen(false)} />
         </View>
       </PaperProvider>
     );
   }
+
   return (
     <PaperProvider>
       <View style={styles.container}>
@@ -292,7 +240,7 @@ const handleLogin = async () => {
           {user.role === 'member' && (
             <>
               <Text style={styles.meta}>Member ID: {user.id}</Text>
-              {user?.avatar_url && (
+              {user.avatar_url && (
                 <Image source={{ uri: user.avatar_url }} style={{ width: 100, height: 100, borderRadius: 50 }} />
               )}
             </>
@@ -323,6 +271,7 @@ const handleLogin = async () => {
     </PaperProvider>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,

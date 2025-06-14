@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   TextInput,
@@ -13,13 +13,14 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Provider as PaperProvider } from 'react-native-paper';
 import MemberDetail from './src/components/MemberDetail';
+import AdminDashboard from './src/components/AdminDashboard';
 import { supabase } from './lib/supabase';
 
 // Type definitions
 
 type User = {
   id: string;
-  oldmember_id?: any;
+  oldmember_id: any;
   full_name: string;
   email: string;
   role?: string;
@@ -42,6 +43,12 @@ export default function App() {
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [viewingSearchScreen, setViewingSearchScreen] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    if (selectedUser) {
+      setEditedName(selectedUser.full_name);
+    }
+  }, [selectedUser]);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -161,10 +168,9 @@ export default function App() {
   const searchUsers = async () => {
     const { data, error } = await supabase
       .from('users')
-      .select('id, full_name, email, role, membership_status, avatar_url')
+      .select('*')
       .ilike('full_name', `%${searchTerm}%`)
       .order('id', { ascending: true });
-    console.log('Search returned', data?.length, 'users:', data);
     if (error) {
       Alert.alert('Search Error', error.message);
     } else {
@@ -201,6 +207,7 @@ export default function App() {
     );
   }
 
+
   if (user.role === 'organiser' && viewingSearchScreen) {
     return (
       <PaperProvider>
@@ -229,6 +236,8 @@ export default function App() {
       </PaperProvider>
     );
   }
+
+
 
   return (
     <PaperProvider>
@@ -263,9 +272,11 @@ export default function App() {
               value={searchTerm}
               onChangeText={setSearchTerm}
             />
+          
             <Button title="Search members" onPress={searchUsers} />
           </>
         )}
+        {user.role === 'admin' && <AdminDashboard onLogout={logout} />}       
         <Button title="Log Out" onPress={logout} color="red" />
       </View>
     </PaperProvider>
