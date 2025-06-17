@@ -48,6 +48,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);  // This is the selected user in some contexts, eg a member
   const [filteredMembers, setFilteredMembers] = useState<User[]>([]);   // This is an array of users eg returned from searching for members
+  const [showProfile, setShowProfile] = useState(false);
+
 
   // Member: Report issue form state
   const [showIssueForm, setShowIssueForm] = useState(false);
@@ -210,6 +212,18 @@ export default function App() {
     );
   }
 
+
+  if (showProfile) {
+    return (
+      <PaperProvider>
+        <MemberDetail
+          user={user}
+          onBack={() => setShowProfile(false)}
+        />
+      </PaperProvider>
+    );
+  }
+
   // Member dashboard
   if (user.role === 'member' || user.role === 'delegate') {
     return (
@@ -229,6 +243,7 @@ export default function App() {
               onNoteSubmitted={() => setShowIssueForm(false)}
             />
           )}
+          <Button title="View/Edit My Profile" onPress={() => setShowProfile(true)}/>
           <Button title="Log Out" onPress={logout} color="red" />
         </ScrollView>
       </PaperProvider>
