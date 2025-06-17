@@ -1,26 +1,32 @@
+// Imports
 import React, { useState, useEffect } from 'react';
 import {
   View,
+  Text,
   TextInput,
   Button,
-  Text,
   StyleSheet,
   Alert,
   ActivityIndicator,
   FlatList,
   Image,
+  ScrollView,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import { Provider as PaperProvider } from 'react-native-paper';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
+import { supabase } from './lib/supabase';
+import SplashScreen from './src/components/SplashScreen';
 import MemberDetail from './src/components/MemberDetail';
 import AdminDashboard from './src/components/AdminDashboard';
-import { supabase } from './lib/supabase';
+import ReportIssueForm from './src/components/ReportIssueForm';
+import MemberFilterPanel from './src/components/MemberFilterPanel';
+import SendMessageForm from './src/components/SendMessageForm';
+import ViewMemberList from './src/components/ViewMemberList';
 
-// Type definitions
-
+// User type
 type User = {
   id: string;
-  oldmember_id: any;
   full_name: string;
   email: string;
   role?: string;
@@ -29,87 +35,38 @@ type User = {
   phone?: string;
   address?: string;
   region?: string;
+  site?: string;
+  active?: boolean;
   created_at?: string;
 };
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [user, setUser] = useState<User | null>(null);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [editedName, setEditedName] = useState('');
+  const [user, setUser] = useState<User | null>(null);  // This is the person using the app
   const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState<User[]>([]);
-  const [viewingSearchScreen, setViewingSearchScreen] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);  // This is the selected user in some contexts, eg a member
+  const [filteredMembers, setFilteredMembers] = useState<User[]>([]);   // This is an array of users eg returned from searching for members
 
+  // Member: Report issue form state
+  const [showIssueForm, setShowIssueForm] = useState(false);
+
+  // Splash screen timer
   useEffect(() => {
-    if (selectedUser) {
-      setEditedName(selectedUser.full_name);
-    }
-  }, [selectedUser]);
+    const timer = setTimeout(() => setShowSplash(false), 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 4],
-      quality: 0.7,
-    });
+  // Organiser screens - so organiser gets to see the member search components when logs in 
+  // the syntax sets default value of screen to 'search'
+  const [screen, setScreen] = useState<'search' | 'list' | 'message' | 'detail'>('search');
 
-    if (result.canceled) return;
-
-    const uri = result.assets?.[0]?.uri;
-    if (uri) uploadImage(uri);
-  };
-
-  const uploadImage = async (uri: string) => {
-    try {
-      setUploading(true);
-      if (!user) return;
-
-      const formData = new FormData();
-      formData.append('file', {
-        uri,
-        name: `${user.id}.jpg`,
-        type: 'image/jpeg',
-      } as any);
-
-      const accessToken = (await supabase.auth.getSession()).data.session?.access_token;
-      if (!accessToken) throw new Error("No access token found");
-
-      const uploadResponse = await fetch(`https://mufqimmxygsryxrigkec.supabase.co/storage/v1/object/avatars/${user.id}.jpg`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'x-upsert': 'true',
-        },
-        body: formData,
-      });
-
-      if (!uploadResponse.ok) {
-        const errText = await uploadResponse.text();
-        throw new Error(errText);
-      }
-
-      const filePath = `avatars/${user.oldmember_id}.jpg`;
-      const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
-      const avatar_url = publicUrlData.publicUrl;
-
-      await supabase.from('users').update({ avatar_url }).eq('id', user.id);
-      setUser((prev) => (prev ? { ...prev, avatar_url } : null));
-      Alert.alert('Success', 'Profile photo updated');
-    } catch (e: any) {
-      Alert.alert('Upload failed', e.message);
-    } finally {
-      setUploading(false);
-    }
-  };
-
+  // Login handler - this won't run until called 
+  // its a separate supabase authentication system handles this
+  // on providing email and password and this being cusseful loginData is returned
   const handleLogin = async () => {
     setLoading(true);
-
     const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -120,9 +77,8 @@ export default function App() {
       setLoading(false);
       return;
     }
-
+  // If user authenticates to supabase We then look up this uuid in our application table users ....
     const userId = loginData.user.id;
-
     const { data: userData, error: userFetchError } = await supabase
       .from('users')
       .select('*')
@@ -136,49 +92,26 @@ export default function App() {
     }
 
     setUser(userData);
-    setEditedName(userData.full_name);
     setLoading(false);
   };
-
-  const updateName = async () => {
-    if (!user) return;
-    const { error } = await supabase
-      .from('users')
-      .update({ full_name: editedName })
-      .eq('id', user.id);
-    if (error) {
-      Alert.alert('Error', error.message);
-    } else {
-      Alert.alert('Saved!', 'Your name has been updated.');
-      setUser({ ...user, full_name: editedName });
-    }
-  };
+  // End of login function 
 
   const logout = async () => {
     await supabase.auth.signOut();
     setEmail('');
     setPassword('');
-    setEditedName('');
-    setSearchTerm('');
-    setSearchResults([]);
-    setViewingSearchScreen(false);
     setUser(null);
+    setShowIssueForm(false);
+    setSelectedUser(null);
+    setFilteredMembers([]);
   };
 
-  const searchUsers = async () => {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .ilike('full_name', `%${searchTerm}%`)
-      .order('id', { ascending: true });
-    if (error) {
-      Alert.alert('Search Error', error.message);
-    } else {
-      setSearchResults(data);
-      setViewingSearchScreen(true);
+  // Everyone gets Splash screen - time for display is in SplashScreen.tsx
+  if (showSplash) {
+    return <SplashScreen onFinish={() => setShowSplash(false)} />;
     }
-  };
 
+  // Login screen - only displayed if no user ...
   if (!user) {
     return (
       <PaperProvider>
@@ -186,97 +119,127 @@ export default function App() {
           <Text style={styles.title}>Login</Text>
           <TextInput placeholder="Email" style={styles.input} onChangeText={setEmail} value={email} />
           <TextInput placeholder="Password" style={styles.input} secureTextEntry onChangeText={setPassword} value={password} />
-          <Button title="Log In" onPress={handleLogin} />
+          <Button title="Log In" onPress={handleLogin} />  {/*THIS DOES THE LOGIN*/}
+          <Text>3 roles to play with</Text>
+          <Text>Dummy db 1000 members, all have pw=123456</Text>
+          <Text>  </Text>
+          <Text>user555@example.com = admin </Text>
+          <Text>user1001@example.com = member </Text>
+          <Text>user100@example.com = organiser </Text>
           {loading && <ActivityIndicator size="large" style={{ marginTop: 20 }} />}
         </View>
       </PaperProvider>
     );
   }
 
+  // Show member details if selected eg if selected in a card produced by ViewMembers when View Details button pressed
   if (selectedUser) {
     return (
       <PaperProvider>
         <MemberDetail
           user={selectedUser}
-          onBack={(shouldRefresh) => {
-            setSelectedUser(null);
-            if (shouldRefresh) searchUsers();
-          }}
+          onBack={() => setSelectedUser(null)}
         />
       </PaperProvider>
     );
   }
-
-
-  if (user.role === 'organiser' && viewingSearchScreen) {
+  // Now we display interfaces depending on role of user - there are 3 roles at present admin / organiser / member
+  // Admin dashboard view
+  if (user.role === 'admin') {
     return (
       <PaperProvider>
-        <View style={styles.container}>
-          <Text style={styles.title}>Search Results</Text>
-          <Button title="Back to Dashboard" onPress={() => setViewingSearchScreen(false)} />
-          <FlatList
-            data={searchResults}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => (
-              <View style={styles.profileCard}>
-                {item.avatar_url && (
-                  <Image
-                    source={{ uri: item.avatar_url }}
-                    style={{ width: 40, height: 40, borderRadius: 20, marginBottom: 8 }}
-                  />
-                )}
-                <Text style={styles.meta}>Name: {item.full_name}</Text>
-                <Text style={styles.meta}>Status: {item.membership_status}</Text>
-                <Button title="View Details" onPress={() => setSelectedUser(item)} />
-              </View>
-            )}
+        <AdminDashboard onLogout={logout} /> 
+      </PaperProvider>
+      );
+  }
+
+  // Organiser dashboard
+  if (user.role === 'organiser') {
+    return (
+      <PaperProvider>
+        <ScrollView contentContainerStyle={styles.container}>
+          <Text style={styles.greeting}>Kia ora, {user.full_name} 👋</Text>
+          <Text style={styles.meta}>Role: {user.role}</Text>
+          <Text style={styles.meta}>Manage members (eg search for David - has pics!) </Text>
+
+          {screen === 'search' && (
+          <>
+          {/* Filter panel */}
+          <MemberFilterPanel
+            onSearchResults={(results: User[]) => {
+              setFilteredMembers(results);
+            }}
           />
-          <Button title="Back to Dashboard" onPress={() => setViewingSearchScreen(false)} />
-        </View>
+
+          {/* Display result size and options */}
+         
+          <View style={{ marginVertical: 10 }}>
+          {filteredMembers.length === 0 ? (
+            <Text>No members found.</Text>
+          ) : (          
+            <>
+              <Text>{filteredMembers.length} members found.</Text>
+              <Button title="View Members" onPress={() => setScreen('list')} />
+              <Button title="Send Message" onPress={() => setScreen('message')} />
+            </> 
+          )}
+          </View>
+        </>
+        )}
+
+
+       {screen === 'list' && (
+          <ViewMemberList
+            members={filteredMembers}
+            onViewDetails={setSelectedUser}    // <-- This is the key!
+            onBack={() => setScreen('search')}
+          />
+        )}
+
+        {/* Message form */}
+          {screen === 'message' && (
+            <SendMessageForm
+              recipients={filteredMembers}
+              onBack={() => setScreen('list')}
+            />
+          )}
+
+          <Button title="Log Out" onPress={logout} color="red" />
+        </ScrollView>
       </PaperProvider>
     );
   }
 
+  // Member dashboard
+  if (user.role === 'member' || user.role === 'delegate') {
+    return (
+      <PaperProvider>
+        <ScrollView contentContainerStyle={styles.container}>
+          <Text style={styles.title}>Member Dashboard</Text>
+          <Text style={styles.greeting}>Kia ora, {user.full_name} 👋</Text>
+          <Text style={styles.meta}>Role: {user.role}</Text>
+          <Text style={styles.meta}>Site: {user.site}</Text>
+          {user.avatar_url && (
+            <Image source={{ uri: user.avatar_url }} style={{ width: 100, height: 100, borderRadius: 50 }} />
+          )}
+          <Button title="Report Issue" onPress={() => setShowIssueForm(true)} />
+          {showIssueForm && (
+            <ReportIssueForm
+              userId={user.id}
+              onNoteSubmitted={() => setShowIssueForm(false)}
+            />
+          )}
+          <Button title="Log Out" onPress={logout} color="red" />
+        </ScrollView>
+      </PaperProvider>
+    );
+  }
 
-
+  // Fallback (should not be reached)
   return (
     <PaperProvider>
       <View style={styles.container}>
-        <Text style={styles.title}>Dashboard</Text>
-        <View style={styles.profileCard}>
-          <Text style={styles.greeting}>Kia ora, {user.full_name} 👋</Text>
-          <Text style={styles.meta}>Role: {user.role}</Text>
-          {user.role === 'member' && (
-            <>
-              <Text style={styles.meta}>Member ID: {user.id}</Text>
-              {user.avatar_url && (
-                <Image source={{ uri: user.avatar_url }} style={{ width: 100, height: 100, borderRadius: 50 }} />
-              )}
-            </>
-          )}
-        </View>
-        {user.role === 'member' && (
-          <>
-            <TextInput style={styles.input} placeholder="Update your name" value={editedName} onChangeText={setEditedName} />
-            <Button title="Save Name" onPress={updateName} />
-            <Button title="Upload Profile Photo" onPress={pickImage} disabled={uploading} />
-            {uploading && <ActivityIndicator style={{ marginTop: 10 }} />}
-          </>
-        )}
-        {user.role === 'organiser' && (
-          <>
-            <Text style={styles.title}>Search Members</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Search by name"
-              value={searchTerm}
-              onChangeText={setSearchTerm}
-            />
-          
-            <Button title="Search members" onPress={searchUsers} />
-          </>
-        )}
-        {user.role === 'admin' && <AdminDashboard onLogout={logout} />}       
+        <Text>Unknown role or error!</Text>
         <Button title="Log Out" onPress={logout} color="red" />
       </View>
     </PaperProvider>
