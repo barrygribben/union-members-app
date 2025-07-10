@@ -3,6 +3,18 @@ import { View, Text, TextInput, Button, StyleSheet, Alert, Image, Platform } fro
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../../lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
+import { useToast } from './ToastProvider';
+import { ToastMessages } from '../utils/toastMessages';
+import {
+  Container,
+  Card,
+  Title,
+  Subtitle,
+  BodyText,
+  PrimaryButton,
+  SecondaryButton,
+  StyledInput,
+} from './StyledComponents';
 
 
 type Props = {
@@ -11,6 +23,7 @@ type Props = {
 };
 
 const ReportIssueForm: React.FC<Props> = ({ userId, onNoteSubmitted }) => {
+  const { showSuccess, showError } = useToast();
   const [noteType, setNoteType] = useState('Health and Safety');
   const [description, setDescription] = useState('');
   const [urgent, setUrgent] = useState(false);
@@ -45,7 +58,7 @@ const ReportIssueForm: React.FC<Props> = ({ userId, onNoteSubmitted }) => {
       ]);
 
       if (insertError) {
-        Alert.alert('Error', insertError.message);
+        showError(insertError.message, 'Error');
         return;
       }
 
@@ -64,7 +77,7 @@ const ReportIssueForm: React.FC<Props> = ({ userId, onNoteSubmitted }) => {
 
           if (uploadError) {
             console.error('Upload error:', uploadError.message);
-            Alert.alert('Upload Failed', uploadError.message);
+            showError(uploadError.message, 'Upload Failed');
             return;
           }
 
@@ -79,24 +92,16 @@ const ReportIssueForm: React.FC<Props> = ({ userId, onNoteSubmitted }) => {
 console.log('All saved ok');
           if (imageInsertError) {
             console.error('Image insert error:', imageInsertError.message);
-            Alert.alert('Image Save Failed', imageInsertError.message);
+            showError(imageInsertError.message, 'Image Save Failed');
             return;
           }
         } catch (err) {
           console.error('Unexpected error in image upload block:', err);
-          Alert.alert('Unexpected Error', 'Could not upload image.');
+          showError('Could not upload image.', 'Unexpected Error');
           return;
         }
       }
-  if (Platform.OS === 'web') {
-        window.alert('Note Submitted. Your issue has been recorded.');
-      } else {
-    Alert.alert(
-    'Note Submitted',
-    'Your issue has been recorded.',
-    [{text: 'OK'}]
-    )
-}
+  showSuccess(ToastMessages.issue.submitted, 'Note Submitted');
         setNoteType('Health and Safety');
         setDescription('');
         setUrgent(false);
@@ -107,30 +112,43 @@ console.log('All saved ok');
 };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Report an Issue</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Type of Note"
-        value={noteType}
-        onChangeText={setNoteType}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Describe the issue"
-        value={description}
-        onChangeText={setDescription}
-        multiline
-      />
-      <Button
-        title={urgent ? 'Mark as NOT Urgent' : 'Mark as Urgent'}
-        onPress={() => setUrgent(!urgent)}
-        color={urgent ? 'red' : 'grey'}
-      />
-      <Button title="Pick an Image (optional)" onPress={pickImage} />
-      {imageUri && <Image source={{ uri: imageUri }} style={styles.imagePreview} />}
-      <Button title="Submit Note" onPress={handleSubmit} />
-    </View>
+    <Container>
+      <Card>
+        <Title>Report an Issue</Title>
+        <Subtitle>Help us improve workplace conditions</Subtitle>
+        
+        <StyledInput
+          placeholder="Type of Issue"
+          value={noteType}
+          onChangeText={setNoteType}
+        />
+        <StyledInput
+          placeholder="Describe the issue in detail"
+          value={description}
+          onChangeText={setDescription}
+          multiline
+        />
+        
+        <SecondaryButton
+          title={urgent ? 'Mark as NOT Urgent' : 'Mark as Urgent'}
+          onPress={() => setUrgent(!urgent)}
+        />
+        
+        <SecondaryButton
+          title="Add Photo (Optional)"
+          onPress={pickImage}
+        />
+        
+        {imageUri && (
+          <Image source={{ uri: imageUri }} style={styles.imagePreview} />
+        )}
+        
+        <PrimaryButton
+          title="Submit Report"
+          onPress={handleSubmit}
+        />
+      </Card>
+    </Container>
   );
 };
 

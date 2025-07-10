@@ -2,6 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { View, TextInput, Button, Text, StyleSheet, Switch } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { supabase } from '../../lib/supabase';
+import {
+  Card,
+  Subtitle,
+  BodyText,
+  PrimaryButton,
+  StyledInput,
+} from './StyledComponents';
 
 export type FilterState = {
   name: string;
@@ -11,9 +18,10 @@ export type FilterState = {
 
 type Props = {
   onSearchResults: (results: any[]) => void;
+  hideTitle?: boolean;
 };
 
-const MemberFilterPanel: React.FC<Props> = ({ onSearchResults }) => {
+const MemberFilterPanel: React.FC<Props> = ({ onSearchResults, hideTitle }) => {
   const [filter, setFilter] = useState<FilterState>({ name: '', site: '', active: false });
   const [sites, setSites] = useState<{ id: string; name: string }[]>([]);
 
@@ -43,36 +51,62 @@ const MemberFilterPanel: React.FC<Props> = ({ onSearchResults }) => {
   };
 
   return (
-    <View style={styles.container}>
-      <TextInput
-        placeholder="Search for name(s)"
-        style={styles.input}
+    <Card>
+      {!hideTitle && <Subtitle>Search Members</Subtitle>}
+      
+      <StyledInput
+        placeholder="Search by name"
         value={filter.name}
         onChangeText={name => setFilter(f => ({ ...f, name }))}
       />
+      
       <Picker
         selectedValue={filter.site}
         onValueChange={site => setFilter(f => ({ ...f, site }))}
-        style={styles.input}
+        style={styles.picker}
       >
         <Picker.Item label="All Sites" value="" />
         {sites.map(s => (
           <Picker.Item label={s.name} value={s.name} key={s.id} />
         ))}
       </Picker>
+      
       <View style={styles.switchRow}>
-        <Text>Active Members Only</Text>
-        <Switch value={filter.active} onValueChange={active => setFilter(f => ({ ...f, active }))} />
+        <BodyText>Active Members Only</BodyText>
+        <Switch 
+          value={filter.active} 
+          onValueChange={active => setFilter(f => ({ ...f, active }))}
+          trackColor={{ false: '#767577', true: '#81b0ff' }}
+          thumbColor={filter.active ? '#f5dd4b' : '#f4f3f4'}
+        />
       </View>
-      <Button title="Search" onPress={handleSearch} />
-    </View>
+      
+      <PrimaryButton
+        title="Search Members"
+        onPress={handleSearch}
+      />
+    </Card>
   );
 };
 
 const styles = StyleSheet.create({
   container: { marginVertical: 10 },
   input: { borderWidth: 1, borderColor: '#ccc', padding: 8, marginBottom: 10, borderRadius: 5 },
-  switchRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  picker: { 
+    borderWidth: 1, 
+    borderColor: '#ccc', 
+    padding: 8, 
+    marginBottom: 10, 
+    borderRadius: 5,
+    backgroundColor: '#fff',
+  },
+  switchRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    paddingVertical: 8,
+  },
 });
 
 export default MemberFilterPanel;

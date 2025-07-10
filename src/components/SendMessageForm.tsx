@@ -1,5 +1,17 @@
 import React, { useState } from 'react';
 import { View, TextInput, Button, Text, Alert } from 'react-native';
+import { useToast } from './ToastProvider';
+import { ToastMessages } from '../utils/toastMessages';
+import {
+  Container,
+  Card,
+  Title,
+  Subtitle,
+  BodyText,
+  PrimaryButton,
+  SecondaryButton,
+  StyledInput,
+} from './StyledComponents';
 
 type User = {
   id: string;
@@ -22,25 +34,38 @@ interface SendMessageFormProps {
 }
 
 const SendMessageForm: React.FC<SendMessageFormProps> = ({ recipients, onBack }) => {
+  const { showSuccess } = useToast();
   const [message, setMessage] = useState('');
   const handleSend = () => {
     // Replace with actual email/send logic
-    Alert.alert('Message Sent', `Message sent to ${recipients.length} members`);
+    showSuccess(ToastMessages.message.sent(recipients.length), 'Message Sent');
     setMessage('');
     onBack();
   };
   return (
-    <View>
-      <Text>Send to {recipients.length} recipients</Text>
-      <TextInput
-        placeholder="Your message"
-        value={message}
-        onChangeText={setMessage}
-        multiline
-      />
-      <Button title="Send" onPress={handleSend} />
-      <Button title="Cancel" onPress={onBack} />
-    </View>
+    <Container>
+      <Card>
+        <Title>Send Message</Title>
+        <Subtitle>Send to {recipients.length} recipients</Subtitle>
+        
+        <StyledInput
+          placeholder="Type your message here..."
+          value={message}
+          onChangeText={setMessage}
+          multiline
+        />
+        
+        <PrimaryButton
+          title="Send Message"
+          onPress={handleSend}
+        />
+        
+        <SecondaryButton
+          title="Cancel"
+          onPress={onBack}
+        />
+      </Card>
+    </Container>
   );
 };
 

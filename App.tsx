@@ -23,6 +23,21 @@ import ReportIssueForm from './src/components/ReportIssueForm';
 import MemberFilterPanel from './src/components/MemberFilterPanel';
 import SendMessageForm from './src/components/SendMessageForm';
 import ViewMemberList from './src/components/ViewMemberList';
+import { ToastProvider, useToast } from './src/components/ToastProvider';
+import { theme } from './src/styles/theme';
+import {
+  Container,
+  Card,
+  Title,
+  Subtitle,
+  BodyText,
+  PrimaryButton,
+  SecondaryButton,
+  DangerButton,
+  StyledInput,
+  SectionHeader,
+} from './src/components/StyledComponents';
+import LogoutIconButton from './src/components/LogoutIconButton';
 
 // User type
 type User = {
@@ -40,7 +55,8 @@ type User = {
   created_at?: string;
 };
 
-export default function App() {
+function AppContent() {
+  const { showSuccess, showError } = useToast();
   const [showSplash, setShowSplash] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -75,7 +91,7 @@ export default function App() {
     });
 
     if (loginError || !loginData.user) {
-      Alert.alert('Login Failed', loginError?.message || 'Unknown error');
+      showError(loginError?.message || 'Unknown error', 'Login Failed');
       setLoading(false);
       return;
     }
@@ -88,12 +104,13 @@ export default function App() {
       .single();
 
     if (userFetchError || !userData) {
-      Alert.alert('Login Success', 'But no user record found in `users` table');
+      showError('But no user record found in `users` table', 'Login Success');
       setLoading(false);
       return;
     }
 
     setUser(userData);
+    showSuccess('Welcome back!');
     setLoading(false);
   };
   // End of login function 
@@ -117,19 +134,44 @@ export default function App() {
   if (!user) {
     return (
       <PaperProvider>
-        <View style={styles.container}>
-          <Text style={styles.title}>Login</Text>
-          <TextInput placeholder="Email" style={styles.input} onChangeText={setEmail} value={email} />
-          <TextInput placeholder="Password" style={styles.input} secureTextEntry onChangeText={setPassword} value={password} />
-          <Button title="Log In" onPress={handleLogin} />  {/*THIS DOES THE LOGIN*/}
-          <Text>3 roles to play with</Text>
-          <Text>Dummy db 1000 members, all have pw=123456</Text>
-          <Text>  </Text>
-          <Text>user555@example.com = admin </Text>
-          <Text>user1001@example.com = member </Text>
-          <Text>user100@example.com = organiser </Text>
-          {loading && <ActivityIndicator size="large" style={{ marginTop: 20 }} />}
-        </View>
+        <Container>
+          <Card style={styles.loginCard}>
+            <Title>Union Members App</Title>
+            <Subtitle>Sign in to your account</Subtitle>
+            
+            <StyledInput
+              placeholder="Email"
+              value={email}
+              onChangeText={setEmail}
+            />
+            <StyledInput
+              placeholder="Password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+            
+            <PrimaryButton
+              title="Sign In"
+              onPress={handleLogin}
+              disabled={loading}
+            />
+            
+            {loading && (
+              <ActivityIndicator 
+                size="large" 
+                color={theme.colors.primary[500]}
+                style={{ marginTop: theme.spacing.lg }}
+              />
+            )}
+            
+            <SectionHeader>Test Accounts</SectionHeader>
+            <BodyText>All accounts use password: 123456</BodyText>
+            <BodyText>• user555@example.com (Admin)</BodyText>
+            <BodyText>• user1001@example.com (Member)</BodyText>
+            <BodyText>• user100@example.com (Organiser)</BodyText>
+          </Card>
+        </Container>
       </PaperProvider>
     );
   }
@@ -150,7 +192,10 @@ export default function App() {
   if (user.role === 'admin') {
     return (
       <PaperProvider>
-        <AdminDashboard onLogout={logout} /> 
+        <Container>
+          <LogoutIconButton onPress={logout} />
+          <AdminDashboard onLogout={logout} />
+        </Container>
       </PaperProvider>
       );
   }
@@ -159,55 +204,63 @@ export default function App() {
   if (user.role === 'organiser') {
     return (
       <PaperProvider>
-        <ScrollView contentContainerStyle={styles.container}>
-          <Text style={styles.greeting}>Kia ora, {user.full_name} 👋</Text>
-          <Text style={styles.meta}>Role: {user.role}</Text>
-          <Text style={styles.meta}>Manage members (eg search for David - has pics!) </Text>
+        <Container>
+          <LogoutIconButton onPress={logout} />
+          <Card>
+            <Title>Organiser Dashboard</Title>
+            <Subtitle>Kia ora, {user.full_name} 👋</Subtitle>
+            <BodyText>Role: {user.role}</BodyText>
+            <BodyText>Manage members (eg search for David - has pics!)</BodyText>
+          </Card>
 
           {screen === 'search' && (
-          <>
-          {/* Filter panel */}
-          <MemberFilterPanel
-            onSearchResults={(results: User[]) => {
-              setFilteredMembers(results);
-            }}
-          />
-
-          {/* Display result size and options */}
-         
-          <View style={{ marginVertical: 10 }}>
-          {filteredMembers.length === 0 ? (
-            <Text>No members found.</Text>
-          ) : (          
             <>
-              <Text>{filteredMembers.length} members found.</Text>
-              <Button title="View Members" onPress={() => setScreen('list')} />
-              <Button title="Send Message" onPress={() => setScreen('message')} />
-            </> 
+              {/* Search Members + Selected: X on same line */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Subtitle style={{ marginBottom: 0 }}>Search Members</Subtitle>
+                <BodyText style={{ marginBottom: 0, fontWeight: '600' }}>Selected: {filteredMembers.length}</BodyText>
+              </View>
+              {/* Filter panel (without its own subtitle) */}
+              <MemberFilterPanel
+                onSearchResults={(results: User[]) => {
+                  setFilteredMembers(results);
+                }}
+                hideTitle
+              />
+              {/* Action buttons always visible */}
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
+                <PrimaryButton
+                  title="View Members"
+                  onPress={() => setScreen('list')}
+                  disabled={filteredMembers.length === 0}
+                  style={{ flex: 1 }}
+                />
+                <SecondaryButton
+                  title="Send Message"
+                  onPress={() => setScreen('message')}
+                  disabled={filteredMembers.length === 0}
+                  style={{ flex: 1 }}
+                />
+              </View>
+            </>
           )}
-          </View>
-        </>
-        )}
 
+          {screen === 'list' && (
+            <ViewMemberList
+              members={filteredMembers}
+              onViewDetails={setSelectedUser}
+              onBack={() => setScreen('search')}
+            />
+          )}
 
-       {screen === 'list' && (
-          <ViewMemberList
-            members={filteredMembers}
-            onViewDetails={setSelectedUser}    // <-- This is the key!
-            onBack={() => setScreen('search')}
-          />
-        )}
-
-        {/* Message form */}
+          {/* Message form */}
           {screen === 'message' && (
             <SendMessageForm
               recipients={filteredMembers}
               onBack={() => setScreen('list')}
             />
           )}
-
-          <Button title="Log Out" onPress={logout} color="red" />
-        </ScrollView>
+        </Container>
       </PaperProvider>
     );
   }
@@ -226,26 +279,46 @@ export default function App() {
 
   // Member dashboard
   if (user.role === 'member' || user.role === 'delegate') {
+    // Show Report Issue form as separate screen
+    if (showIssueForm) {
+      return (
+        <PaperProvider>
+          <ReportIssueForm
+            userId={user.id}
+            onNoteSubmitted={() => setShowIssueForm(false)}
+          />
+        </PaperProvider>
+      );
+    }
+
     return (
       <PaperProvider>
-        <ScrollView contentContainerStyle={styles.container}>
-          <Text style={styles.title}>Member Dashboard</Text>
-          <Text style={styles.greeting}>Kia ora, {user.full_name} 👋</Text>
-          <Text style={styles.meta}>Role: {user.role}</Text>
-          <Text style={styles.meta}>Site: {user.site}</Text>
-          {user.avatar_url && (
-            <Image source={{ uri: user.avatar_url }} style={{ width: 100, height: 100, borderRadius: 50 }} />
-          )}
-          <Button title="Report Issue" onPress={() => setShowIssueForm(true)} />
-          {showIssueForm && (
-            <ReportIssueForm
-              userId={user.id}
-              onNoteSubmitted={() => setShowIssueForm(false)}
+        <Container>
+          <LogoutIconButton onPress={logout} />
+          <Card>
+            <Title>Member Dashboard</Title>
+            <Subtitle>Kia ora, {user.full_name} 👋</Subtitle>
+            <BodyText>Role: {user.role}</BodyText>
+            <BodyText>Site: {user.site}</BodyText>
+            {user.avatar_url && (
+              <Image 
+                source={{ uri: user.avatar_url }} 
+                style={styles.avatar} 
+              />
+            )}
+          </Card>
+
+          <Card>
+            <PrimaryButton
+              title="Report Issue"
+              onPress={() => setShowIssueForm(true)}
             />
-          )}
-          <Button title="View/Edit My Profile" onPress={() => setShowProfile(true)}/>
-          <Button title="Log Out" onPress={logout} color="red" />
-        </ScrollView>
+            <SecondaryButton
+              title="View/Edit My Profile"
+              onPress={() => setShowProfile(true)}
+            />
+          </Card>
+        </Container>
       </PaperProvider>
     );
   }
@@ -253,10 +326,13 @@ export default function App() {
   // Fallback (should not be reached)
   return (
     <PaperProvider>
-      <View style={styles.container}>
-        <Text>Unknown role or error!</Text>
-        <Button title="Log Out" onPress={logout} color="red" />
-      </View>
+      <Container>
+        <Card>
+          <Title>Error</Title>
+          <BodyText>Unknown role or error!</BodyText>
+          <DangerButton title="Log Out" onPress={logout} />
+        </Card>
+      </Container>
     </PaperProvider>
   );
 }
@@ -266,6 +342,11 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: 20,
     backgroundColor: '#fff',
+  },
+  loginCard: {
+    maxWidth: 400,
+    alignSelf: 'center',
+    width: '100%',
   },
   title: {
     fontSize: 28,
@@ -299,4 +380,20 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     borderRadius: 5,
   },
+  avatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignSelf: 'center',
+    marginVertical: theme.spacing.md,
+  },
 });
+
+// Main App component with ToastProvider wrapper
+export default function App() {
+  return (
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
+  );
+}
